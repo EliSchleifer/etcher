@@ -1,26 +1,38 @@
 env:
   browser: true
   commonjs: true
-  es6: true
+  es2019: true
   node: true
   mocha: true
+
 plugins:
   - lodash
   - jsdoc
   - node
   - react
-extends: 'standard'
+
+extends:
+  - eslint:recommended
+  - airbnb
+  - plugin:@typescript-eslint/recommended
+  - plugin:import/recommended
+  - plugin:node/recommended
+  - plugin:react/recommended
+  - plugin:react-hooks/recommended
+  - prettier # this actually turns OFF all prettier rules running via eslint (since we run it directly)
+
 parserOptions:
-  sourceType: 'script'
+  sourceType: "module"
+  ecmaVersion: 10
   ecmaFeatures:
     jsx: true
+
 settings:
   jsdoc:
     additionalTagNames:
       customTags:
         - fulfil
 rules:
-
   # Possible Errors
 
   no-console:
@@ -429,26 +441,19 @@ rules:
 
   # Node
 
-  node/no-deprecated-api:
-    - error
-  node/no-missing-import:
-    - error
-  node/no-missing-require:
-    - error
-  node/process-exit-as-throw:
-    - error
-  node/no-extraneous-require:
-    - error
-  node/no-extraneous-import:
-    - error
+  node/no-deprecated-api: error
+  node/no-missing-import: off
+  node/no-missing-require: error
+  node/process-exit-as-throw: error
+  node/no-extraneous-require: error
+  node/no-extraneous-import: error
+  node/no-unsupported-features/es-syntax:
+    [error, { ignores: [modules, dynamicImport] }]
+  node/no-unpublished-import: off
 
   # React
 
   react/jsx-uses-vars:
     - error
 
-overrides:
-  files: ['*.jsx']
-  rules:
-    require-jsdoc:
-    - off
+overrides: [{ files: ["*.jsx"], rules: { "require-jsdoc": off } }]
