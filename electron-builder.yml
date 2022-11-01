@@ -16,6 +16,8 @@ mac:
   entitlements: "entitlements.mac.plist"
   entitlementsInherit: "entitlements.mac.plist"
   artifactName: "${productName}-${version}.${ext}"
+  target:
+    - dmg
 dmg:
   background: assets/dmg/background.tiff
   icon: assets/icon.icns

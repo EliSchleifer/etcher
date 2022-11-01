@@ -84,6 +84,7 @@ runs:
     # https://github.com/getsentry/sentry-cli
     # https://docs.sentry.io/api/projects/create-a-new-client-key/
     - name: Generate Sentry DSN
+      id: sentry
       shell: bash --noprofile --norc -eo pipefail -x {0}
       run: |
         set -ea
@@ -99,7 +100,7 @@ runs:
           --org="$(yq e '.sentry.org' repo.yml)" \
           --type="$(yq e '.sentry.type' repo.yml)")"
 
-        echo "${stdout}" | tail -n 1 > '${{ runner.temp }}/sentry_dsn'
+        echo "dsn=$(echo "${stdout}" | tail -n 1)" >> $GITHUB_OUTPUT
 
       env:
         SENTRY_TOKEN: ${{ fromJSON(inputs.secrets).CUSTOM_JOB_SECRET_1 }}
@@ -144,34 +145,31 @@ runs:
 
         [[ '${{ inputs.VERBOSE }}' =~ on|On|Yes|yes|true|True ]] && set -x
 
-        [[ -e functions ]] && . functions
-
         runner_os="$(echo "${RUNNER_OS}" | tr '[:upper:]' '[:lower:]')"
         runner_arch="$(echo "${RUNNER_ARCH}" | tr '[:upper:]' '[:lower:]')"
 
         ELECTRON_BUILDER_ARCHITECTURE="${runner_arch}"
-        APPLICATION_NAME="$(jq -r '.name' package.json)"
         APPLICATION_VERSION="$(jq -r '.version' package.json)"
         ARCHITECTURE_FLAGS="--${ELECTRON_BUILDER_ARCHITECTURE}"
 
         if [[ $runner_os =~ linux ]]; then
-            APPLICATION_NAME="${APPLICATION_NAME}-electron"
-            ELECTRON_BUILDER_OS=linux
-            TARGETS='deb rpm appimage'
+            ELECTRON_BUILDER_OS='--linux'
+            TARGETS="$(yq e .linux.target[] electron-builder.yml)"
 
         elif [[ $runner_os =~ darwin|macos|osx ]]; then
             CSC_KEY_PASSWORD=${{ fromJSON(inputs.secrets).CUSTOM_JOB_SECRET_3 }}
             CSC_KEYCHAIN=signing_temp
             CSC_LINK=${{ fromJSON(inputs.secrets).CUSTOM_JOB_SECRET_2 }}
-            ELECTRON_BUILDER_OS=mac
-            TARGETS='dmg zip'
+            ELECTRON_BUILDER_OS='--mac'
+            TARGETS="$(yq e .mac.target[] electron-builder.yml)"
 
         elif [[ $runner_os =~ windows|win ]]; then
             ARCHITECTURE_FLAGS="--ia32 ${ARCHITECTURE_FLAGS}"
             CSC_KEY_PASSWORD=${{ fromJSON(inputs.secrets).CUSTOM_JOB_SECRET_5 }}
             CSC_LINK=${{ fromJSON(inputs.secrets).CUSTOM_JOB_SECRET_4 }}
-            ELECTRON_BUILDER_OS=win
-            TARGETS='nsis portable'
+            ELECTRON_BUILDER_OS='--win'
+            TARGETS="$(yq e .win.target[] electron-builder.yml)"
+
         else
             exit 1
         fi
@@ -179,25 +177,9 @@ runs:
         npm link electron-builder
 
         for target in ${TARGETS}; do
-            electron-builder \
-              --c.extraMetadata.analytics.sentry.token="$(cat < '${{ runner.temp }}/sentry_dsn')" \
-              --c.extraMetadata.name="${APPLICATION_NAME}" \
-              --c.extraMetadata.packageType="${target}" \
-              --c.extraMetadata.version="${APPLICATION_VERSION}" \
-              "--${ELECTRON_BUILDER_OS}" \
-              ${ARCHITECTURE_FLAGS}
-
-            if [[ $target =~ appimage ]]; then
-                PRODUCT_NAME="$(yq e .productName electron-builder.yml)"
-                BUILD_DIRECTORY="$(pwd)/dist"
-                APPIMAGE_PATH="${BUILD_DIRECTORY}/${PRODUCT_NAME}-${APPLICATION_VERSION}-${ELECTRON_BUILDER_ARCHITECTURE}.AppImage"
-                APPIMAGE_ZIP_PATH="${BUILD_DIRECTORY}/${APPLICATION_NAME}-${APPLICATION_VERSION}-${ELECTRON_BUILDER_OS}-${ELECTRON_BUILDER_ARCHITECTURE}.zip"
-
-                zip_file \
-                  -f "${APPIMAGE_PATH}" \
-                  -s "${ELECTRON_BUILDER_OS}" \
-                  -o "${APPIMAGE_ZIP_PATH}"
-            fi
+            electron-builder ${ELECTRON_BUILDER_OS} ${ARCHITECTURE_FLAGS} \
+              --c.extraMetadata.analytics.sentry.token='${{ steps.sentry.outputs.dsn }}' \
+              --c.extraMetadata.packageType="${target}"
         done
 
         echo "version=${APPLICATION_VERSION}" >> $GITHUB_OUTPUT
