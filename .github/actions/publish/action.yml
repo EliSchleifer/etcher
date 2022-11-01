@@ -223,18 +223,6 @@ runs:
         # https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks#about-workflow-runs-from-public-forks
         CSC_FOR_PULL_REQUEST: true
 
-    - name: Rename release assets
-      shell: bash --noprofile --norc -eo pipefail -x {0}
-      run: |
-        set -ea
-
-        [[ '${{ inputs.VERBOSE }}' =~ on|On|Yes|yes|true|True ]] && set -x
-
-        # generalise release asset names (latest) to avoid rebuilding/renaming on finalize
-        find dist -type f -maxdepth 1 \
-          -name "*${{ steps.package_release.outputs.version }}*" \
-          -exec sh -c 'mv {} $(echo {} | sed 's/${{ steps.package_release.outputs.version }}/latest/g')' \;
-
     # https://www.electron.build/auto-update.html#staged-rollouts
     - name: Configure staged rollout(s)
       shell: bash --noprofile --norc -eo pipefail -x {0}
