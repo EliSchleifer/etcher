@@ -151,23 +151,21 @@ runs:
 
         ELECTRON_BUILDER_ARCHITECTURE="${runner_arch}"
         APPLICATION_NAME="$(jq -r '.name' package.json)"
-
-        # valid https://semver.org/ required (e.g. https://regex101.com/r/Ly7O1x/3/)
-        # files renamed post build
         APPLICATION_VERSION="$(jq -r '.version' package.json)"
-
         ARCHITECTURE_FLAGS="--${ELECTRON_BUILDER_ARCHITECTURE}"
 
         if [[ $runner_os =~ linux ]]; then
             APPLICATION_NAME="${APPLICATION_NAME}-electron"
             ELECTRON_BUILDER_OS=linux
             TARGETS='deb rpm appimage'
+
         elif [[ $runner_os =~ darwin|macos|osx ]]; then
             CSC_KEY_PASSWORD=${{ fromJSON(inputs.secrets).CUSTOM_JOB_SECRET_3 }}
             CSC_KEYCHAIN=signing_temp
             CSC_LINK=${{ fromJSON(inputs.secrets).CUSTOM_JOB_SECRET_2 }}
             ELECTRON_BUILDER_OS=mac
             TARGETS='dmg zip'
+
         elif [[ $runner_os =~ windows|win ]]; then
             ARCHITECTURE_FLAGS="--ia32 ${ARCHITECTURE_FLAGS}"
             CSC_KEY_PASSWORD=${{ fromJSON(inputs.secrets).CUSTOM_JOB_SECRET_5 }}
@@ -181,17 +179,7 @@ runs:
         npm link electron-builder
 
         for target in ${TARGETS}; do
-
-            # FIXME: (de)hairball this
-            ELECTRON_BUILDER_CONFIG="$(mktemp)"
-            node extend-electron-builder-config.js \
-              "$(pwd)/.resinci.json" \
-              "${APPLICATION_NAME}" > "${ELECTRON_BUILDER_CONFIG}"
-
-            PRODUCT_NAME="$(jq -r '.productName' "${ELECTRON_BUILDER_CONFIG}")"
-
             electron-builder \
-              --config="${ELECTRON_BUILDER_CONFIG}" \
               --c.extraMetadata.analytics.sentry.token="$(cat < '${{ runner.temp }}/sentry_dsn')" \
               --c.extraMetadata.name="${APPLICATION_NAME}" \
               --c.extraMetadata.packageType="${target}" \
@@ -199,17 +187,16 @@ runs:
               "--${ELECTRON_BUILDER_OS}" \
               ${ARCHITECTURE_FLAGS}
 
-            rm "${ELECTRON_BUILDER_CONFIG}"
-
             if [[ $target =~ appimage ]]; then
-              BUILD_DIRECTORY="$(pwd)/dist"
-              APPIMAGE_PATH="${BUILD_DIRECTORY}/${PRODUCT_NAME}-${APPLICATION_VERSION}-${ELECTRON_BUILDER_ARCHITECTURE}.AppImage"
-              APPIMAGE_ZIP_PATH="${BUILD_DIRECTORY}/${APPLICATION_NAME}-${APPLICATION_VERSION}-${ELECTRON_BUILDER_OS}-${ELECTRON_BUILDER_ARCHITECTURE}.zip"
+                PRODUCT_NAME="$(yq e .productName electron-builder.yml)"
+                BUILD_DIRECTORY="$(pwd)/dist"
+                APPIMAGE_PATH="${BUILD_DIRECTORY}/${PRODUCT_NAME}-${APPLICATION_VERSION}-${ELECTRON_BUILDER_ARCHITECTURE}.AppImage"
+                APPIMAGE_ZIP_PATH="${BUILD_DIRECTORY}/${APPLICATION_NAME}-${APPLICATION_VERSION}-${ELECTRON_BUILDER_OS}-${ELECTRON_BUILDER_ARCHITECTURE}.zip"
 
-              zip_file \
-                -f "${APPIMAGE_PATH}" \
-                -s "${ELECTRON_BUILDER_OS}" \
-                -o "${APPIMAGE_ZIP_PATH}"
+                zip_file \
+                  -f "${APPIMAGE_PATH}" \
+                  -s "${ELECTRON_BUILDER_OS}" \
+                  -o "${APPIMAGE_ZIP_PATH}"
             fi
         done
 

@@ -1,10 +1,10 @@
+# https://www.electron.build/configuration/configuration
 appId: io.balena.etcher
 copyright: Copyright 2016-2021 Balena Ltd
 productName: balenaEtcher
-npmRebuild: true
-nodeGypRebuild: false
 publish: null
 afterPack: "./afterPack.js"
+afterSign: ./afterSignHook.js
 asar: false
 files:
   - generated
@@ -32,6 +32,10 @@ dmg:
     height: 405
 win:
   icon: assets/icon.ico
+  target:
+    - zip
+    - nsis
+    - portable
 nsis:
   oneClick: true
   runAfterFinish: true
@@ -44,14 +48,22 @@ portable:
   artifactName: "${productName}-Portable-${version}.${ext}"
   requestExecutionLevel: user
 linux:
+  icon: assets/iconset
+  target:
+    - AppImage
+    - rpm
+    - deb
   category: Utility
   packageCategory: utils
-  executableName: balena-etcher-electron
+  executableName: balena-etcher
   synopsis: balenaEtcher is a powerful OS image flasher built with web technologies to ensure flashing an SDCard or USB drive is a pleasant and safe experience. It protects you from accidentally writing to your hard-drives, ensures every byte of data was written correctly and much more.
-  icon: assets/iconset
+appImage:
+  publish: null
+  artifactName: ${productName}-${version}-${env.ELECTRON_BUILDER_ARCHITECTURE}.${ext}
 # https://www.electron.build/configuration/linux#debian-package-options
 deb:
   priority: optional
+  compression: bzip2
   # FIXME: review these and ideally avoid pipe operator
   depends:
     - gconf-service
